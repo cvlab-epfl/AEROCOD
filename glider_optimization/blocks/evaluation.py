@@ -73,11 +73,11 @@ class Evaluation(Block):
         return sum(cost_vals) / len(cost_vals)
         
     def forward_time(self):
-        total_time = [t["state_traj_opt"][:,7].sum() for t in self.last_traj]
+        total_time = [t["state_traj_opt"][:,-1].sum() for t in self.last_traj]  # dt is always last state
         return sum(total_time) / len(total_time)
     
     def backward_ocp_cost(self):
-        w = self.config.ocp.terminal_state_weight
+        w = list(self.config.ocp.terminal_state_weight)
         
         dJ_deps_list = []
         for traj in self.last_traj:
@@ -85,7 +85,12 @@ class Evaluation(Block):
             eps_terminal = traj['state_traj_opt'][-1]
             
             # TODO: this works only because the target is (0,0..)
-            dJ_deps_traj[-1, :] = 2 * (w * eps_terminal)
+            # Pad w to match state dimension when extra states are appended (e.g. CL_f lag state)
+            if len(eps_terminal) > len(w):
+                w_eff = np.array(w + [0.] * (len(eps_terminal) - len(w)))
+            else:
+                w_eff = np.array(w)
+            dJ_deps_traj[-1, :] = 2 * (w_eff * eps_terminal)
             
             dJ_deps_list.append(dJ_deps_traj)
             
@@ -95,7 +100,7 @@ class Evaluation(Block):
         dJ_deps_list = []
         for traj in self.last_traj:
             dJ_deps_traj = np.zeros(traj['state_traj_opt'].shape)
-            dJ_deps_traj[:,7] = 1.
+            dJ_deps_traj[:,-1] = 1.  # dt is always last state
             dJ_deps_list.append(dJ_deps_traj)
 
         return dJ_deps_list

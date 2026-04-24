@@ -168,7 +168,11 @@ class GliderPerching :
         
         phidot = SX.sym("phidot") # elevator angular velocity
 
-        self.X = vertcat(x, z, theta, phi, xdot, zdot, thetadot, t)
+        if self.config.neuralFoilSampling.cl_lag_enabled:
+            CL_f = SX.sym("CL_f")
+            self.X = vertcat(x, z, theta, phi, xdot, zdot, thetadot, CL_f, t)  # dt always last
+        else:
+            self.X = vertcat(x, z, theta, phi, xdot, zdot, thetadot, t)
         self.U = phidot
 
         # Role 3 — torque arm: F_w applied at c/4 (l_w_ac), consistent with NeuralFoil CM convention;
@@ -207,6 +211,15 @@ class GliderPerching :
         CD_w = w*dot(X, phi_CD) + (1-w)*self.C_D(alpha_w)
         CM_w = w*dot(X, phi_CM) + (1-w)*self.C_M(alpha_w)
 
+        # Beddoes-Leishman attached-flow lag (Leishman 1989)
+        if self.config.neuralFoilSampling.cl_lag_enabled:
+            _Tf = self.config.neuralFoilSampling.cl_lag_Tf
+            v_safe = fmax(v_w, 0.1)
+            dCL_f_dt = (CL_w - CL_f) * 2 * v_safe / (_Tf * chord)
+            CL_eff = CL_f   # lagged lift replaces quasi-steady in lift force only
+        else:
+            CL_eff = CL_w
+
         # Sugar-Gabor (2018) Eq. 13 — quasi-unsteady corrections (Terms 2 & 3)
         # Term 2: ½ρ·c·S·Clα·θ̇ in lift direction  (∂Γ/∂t ≈ ½v_w·c·Clα·θ̇, dS=c·dy)
         # Term 3: ½ρ·c·S·CL·θ̇  in drag direction  (dn̂/dt = -θ̇·ĉ)
@@ -231,8 +244,8 @@ class GliderPerching :
             F_w3 = SX.zeros(2, 1)
 
         # force vectors for aerodynamic surfaces (lift, drag, gravity)
-        F_Lw = CL_w * vertcat(-z_wdot, x_wdot)  # lift force vector (proportional to)
-        F_Dw = CD_w * vertcat(-x_wdot, -z_wdot) # drag force vector (proportional to)
+        F_Lw = CL_eff * vertcat(-z_wdot, x_wdot)  # lift force vector (proportional to)
+        F_Dw = CD_w   * vertcat(-x_wdot, -z_wdot)  # drag force vector (proportional to)
         F_w = 0.5 * rho * v_w * S_w * (F_Lw + F_Dw) + F_w2 + F_w3
         M_w = 0.5 * rho * v_w**2 * S_w * chord * CM_w
 
@@ -263,11 +276,18 @@ class GliderPerching :
             [alpha_w, v_w, CL_w, CD_w, CM_w, F_w, F_e, τ_w, τ_e, xddot, zddot, thetaddot]
         )
         
-        self.f = vertcat(xdot, zdot, thetadot, phidot, xddot, zddot, thetaddot, 0)
+        if self.config.neuralFoilSampling.cl_lag_enabled:
+            self.f = vertcat(xdot, zdot, thetadot, phidot, xddot, zddot, thetaddot, dCL_f_dt, 0)
+        else:
+            self.f = vertcat(xdot, zdot, thetadot, phidot, xddot, zddot, thetaddot, 0)
 
     def initCost(self, state_weights, wu=0.001, stage_scale = 0.0001, init_state = None):
-        # [x   z   theta   phi   xdot   zdot   thetadot]
+        # [x   z   theta   phi   xdot   zdot   thetadot   (CL_f)   t]  -- dt always last
         self.goal = [0., 0., 0., 0., 0., 0., 0., 0.]
+        if self.config.neuralFoilSampling.cl_lag_enabled:
+            self.goal.append(0.)
+            if len(state_weights) == 8:
+                state_weights = list(state_weights) + [0.]
         
         if self.config.evaluation.mode == EvaluationMode.SoftLanding:
             if init_state is None:

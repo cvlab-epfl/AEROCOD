@@ -184,7 +184,16 @@ class OCP(Block):
         if states is None or len(states) == 0:
             raise RuntimeError(f"No initial states configured for mode={mode}")
 
-        return states
+        cl_lag = getattr(self.config.neuralFoilSampling, "cl_lag_enabled", False)
+        adjusted = []
+        for s in states:
+            s = list(s)
+            if cl_lag and len(s) == 8:
+                s = s[:7] + [0.5] + s[7:]  # insert CL_f(0) at index 7, dt stays last
+            elif not cl_lag and len(s) == 9:
+                s = s[:7] + s[8:]           # remove CL_f at index 7
+            adjusted.append(s)
+        return adjusted
 
     def _chebyshev_nodes(self, a: float, b: float, n: int) -> np.ndarray:
         k = np.arange(n)

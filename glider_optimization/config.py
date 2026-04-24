@@ -64,9 +64,13 @@ class NeuralFoilSamplingConfig(BaseModel):
     # Optional: upgrade 2D sampling to 3D LLT
     use_3d_llt: bool = False
 
-    # Sugar-Gabor (2018) quasi-unsteady corrections in OCP dynamics (Terms 2 & 3, Eq. 13)
+    # Sugar-Gabor (2018) quasi-unsteady corrections in OCP dynamics 
     unsteady: bool = False
 
+    # First-order boundary-layer lag on CL (Beddoes-Leishman attached-flow lag)
+    cl_lag_enabled: bool = False
+    cl_lag_Tf: float = 6.0
+    
     # Solver settings
     llt_n_iter: int = 30
     llt_max_iter: int = 200

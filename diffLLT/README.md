@@ -41,13 +41,7 @@ For full derivations see:
 
 At the converged fixed point `Γ*(ψ)` satisfying `F(Γ, ψ) = 0`:
 
-$$
-\frac{\partial J}{\partial \psi} =
-\underbrace{\frac{\partial C}{\partial \psi}\bigg|_{\Gamma^*}}_{\text{direct}}
-- \underbrace{\lambda^\top \frac{\partial F}{\partial \psi}\bigg|_{\Gamma^*}}_{\text{implicit}}
-\quad\text{where}\quad
-J^\top \lambda = \frac{\partial \tilde{L}}{\partial \Gamma}
-$$
+$$\frac{\partial J}{\partial \psi} = \underbrace{\frac{\partial C}{\partial \psi}\bigg|\_{\Gamma^\*}}\_{\text{direct}} - \underbrace{\lambda^\top \frac{\partial F}{\partial \psi}\bigg|\_{\Gamma^\*}}\_{\text{implicit}} \quad\text{where}\quad J^\top \lambda = \frac{\partial \tilde{L}}{\partial \Gamma}$$
 
 This is handled automatically by `LLTImplicitFn.backward`; `core.py` just calls
 `loss.backward()`.
@@ -80,7 +74,7 @@ velocities = torch.tensor([10.] * 5, device=wing.device)             # m/s
 
 # 3 — evaluate LLT (differentiable)
 evaluator = DiffLLTEvaluator(wing)
-airfoil   = AirfoilParams.default(wing.device)
+airfoil   = AirfoilParams.from_yaml("conf/test.yaml", wing.device)
 result    = evaluator(alphas, velocities, airfoil)   # → EvalResult(CL, CD, CM)
 
 # 4 — optimise
@@ -106,7 +100,14 @@ the LLT influence matrices.  Parameters:
 ### `AirfoilParams`
 
 Holds `upper` (8,), `lower` (8,), `LE` (1,), `TE` (1,) tensors with
-`requires_grad=True`.  Optionally tip arrays for spanwise variation.
+`requires_grad=True`.  Optionally tip arrays (`upper_tip`, `lower_tip`, `LE_tip`,
+`TE_tip`) for spanwise linear interpolation.
+
+| constructor | when to use |
+|---|---|
+| `AirfoilParams.from_yaml(path, device, requires_grad=True)` | **preferred** — reads the `airfoil:` block from a YAML config |
+| `AirfoilParams.default(device)` | quick placeholder (NACA-like but not exact) |
+| `AirfoilParams.default_3d(device)` | root+tip placeholder pair |
 
 ### `DiffLLTEvaluator(wing)(alphas, velocities, airfoil) → EvalResult`
 

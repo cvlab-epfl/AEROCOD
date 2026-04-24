@@ -1,4 +1,6 @@
-# Glider Optimization
+# Aerodynamics Co-Design
+
+<img width="2160" height="600" alt="perching_trajectory_evolution" src="https://github.com/user-attachments/assets/e7794cb6-54f9-4705-9d6c-ebc846d6c1e9" />
 
 Gradient-based nested co-design of aerodynamic shape and flight trajectory for agile glider manoeuvres such as perching and soft landing.
 
